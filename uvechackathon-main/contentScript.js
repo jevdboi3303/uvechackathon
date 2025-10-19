@@ -1,6 +1,6 @@
 // ---- contentScript.js ----
 // Handles note creation and sidebar rendering.
-// Relies on global functions postNote() and getNotesForUrl() defined in supabaseClient.js.
+// Relies on global functions postNote(), getNotesForUrl(), and likeNote() defined in supabaseClient.js.
 
 let fab; // The floating button
 let sidebarOpen = false;
@@ -93,8 +93,8 @@ async function addPageNote() {
 
 async function addSelectionNote() {
     const selection = window.getSelection();
-    const selectionText = selection ? selection.toString().trim() : "";
-    if (!selectionText) return;
+    const selectionText = selection ? selection.toString() : "";
+    if (!selectionText.trim()) return;
 
     const pageUrl = location.origin + location.pathname;
     const noteText = prompt("Add note for this selection (public):", "");
@@ -142,17 +142,28 @@ async function renderSidebar() {
             card.className = "wn-card";
             const sel = n.selection_text ? `<div class="wn-sel">“${escapeHtml(n.selection_text)}”</div>` : "";
 
+            // --- UPDATED HTML FOR NOTE CARD ---
             card.innerHTML = `
             ${sel}
             <div class="wn-note">${escapeHtml(n.note_text)}</div>
             <div class="wn-meta">${new Date(n.created_at).toLocaleString()} · ${n.user_id}</div>
+            <div class="wn-card-footer">
+                <button class="wn-like-btn" data-note-id="${n.id}">👍</button>
+                <span class="wn-like-count">${n.like_count || 0}</span>
+            </div>
             `;
+            // --- END UPDATED HTML ---
 
+            // Add click-to-find listener
             if (n.selection_text) {
                 card.style.cursor = "pointer";
                 card.dataset.selectionText = n.selection_text; 
                 card.addEventListener('click', handleNoteClick);
             }
+
+            // --- ADD LISTENER FOR NEW LIKE BUTTON ---
+            card.querySelector('.wn-like-btn').addEventListener('click', handleLikeClick);
+            // --- END ADD LISTENER ---
 
             container.appendChild(card);
         });
@@ -162,26 +173,53 @@ async function renderSidebar() {
     }
 }
 
-// --- NEW, SIMPLER CLICK HANDLER ---
+// --- NEW FUNCTION TO HANDLE LIKES ---
+async function handleLikeClick(event) {
+    // Stop the click from triggering the "find text" event
+    event.stopPropagation(); 
+    
+    const button = event.currentTarget;
+    const noteId = button.dataset.noteId;
+    const countSpan = button.nextElementSibling;
+
+    // Disable button to prevent double-clicking
+    button.disabled = true;
+
+    try {
+        // Call the backend function
+        await likeNote(noteId);
+        
+        // Update the count in the UI
+        const currentLikes = parseInt(countSpan.textContent) || 0;
+        countSpan.textContent = currentLikes + 1;
+        
+    } catch (e) {
+        console.error("Failed to like note:", e);
+        // Re-enable button if it failed
+        button.disabled = false;
+    }
+}
+// --- END NEW FUNCTION ---
+
 function handleNoteClick(event) {
     const noteCard = event.currentTarget;
     const textToFind = noteCard.dataset.selectionText;
     if (!textToFind) return;
 
-    // Clear any previous selection
+    window.focus();
     window.getSelection().removeAllRanges();
-
-    // Use Chrome's built-in Find function
-    const found = window.find(textToFind, false, false, true, false, false, false);
-    // (text, caseSensitive, backwards, wrapAround, wholeWord, searchInFrames, showDialog)
+    const found = window.find(textToFind, false, false, true, false, true, false);
 
     if (!found) {
-        alert("Could not find this highlight on the page. The content may have changed.");
+        window.getSelection().removeAllRanges();
+        window.scrollTo(0, 0);
+        const foundFromTop = window.find(textToFind, false, false, true, false, true, false);
+        
+        if (!foundFromTop) {
+            alert("Could not find this highlight on the page. The content may have changed.");
+        }
     }
 }
-// --- END NEW HANDLER ---
-
-// --- highlightFirstOccurrence() FUNCTION IS NOW REMOVED ---
 
 function escapeHtml(s) {
     return s.replace(/[&<>"']/g, c => ({

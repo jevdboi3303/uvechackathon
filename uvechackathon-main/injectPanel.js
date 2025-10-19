@@ -15,20 +15,49 @@ const CSS_TEXT = `
         cursor:pointer;padding:2px 8px}
         .wn-list{overflow:auto;max-height:65vh;padding:0 4px 4px}
         .wn-card{border:1px solid #eef2f7;border-radius:10px;padding:8px;margin:8px 0;background:#fafbfc}
-        
-        /* --- THIS IS THE FIX --- */
         .wn-sel{
             font-style:italic;color:#374151;margin-bottom:4px;
+            word-break: break-word;
             overflow: hidden;
             text-overflow: ellipsis;
             display: -webkit-box;
-            -webkit-line-clamp: 2; /* Limit to 2 lines */
+            -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
         }
-        /* --- END FIX --- */
-
         .wn-note{margin:4px 0}
-        .wn-meta{font-size:12px;color:#6b7280}
+        .wn-meta{font-size:12px;color:#6b7280; margin-bottom: 8px;}
+        
+        /* --- ADD THESE NEW STYLES --- */
+        .wn-card-footer {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-top: 1px solid #eef2f7;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+        .wn-like-btn {
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .wn-like-btn:hover {
+            background: #f0f0f0;
+        }
+        .wn-like-btn:disabled {
+            background: #e0f0ff;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .wn-like-count {
+            font-size: 13px;
+            color: #555;
+            font-weight: 500;
+        }
+        /* --- END NEW STYLES --- */
         `;
 
         (function () {
