@@ -137,3 +137,18 @@ To run this extension locally, you'll need to set up a Supabase backend and then
 ---
 
 ## 📂 File Structure
+web-notes-extension/
+│
+├── icons/                       # Extension icons used in manifest
+│   ├── icon16.png               # Toolbar icon (16x16)
+│   ├── icon48.png               # Medium icon (48x48)
+│   └── icon128.png              # Large icon for Chrome Web Store (128x128)
+│
+├── contentScript.js             # Handles highlights, "+ Note" button, and sidebar logic
+├── injectPanel.js               # Builds and manages the sidebar UI (auth + notes)
+├── manifest.json                # Chrome Extension configuration and permissions
+├── README.md                    # Project documentation
+├── service_worker.js            # Background worker for initialization logs
+├── styles.css                   # Shared CSS (highlighting, floating button)
+├── supabase.min.js              # Supabase client library (minified)
+└── supabaseClient.js            # Supabase initialization, auth, and CRUD logic
