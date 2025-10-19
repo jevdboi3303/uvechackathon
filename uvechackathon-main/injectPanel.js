@@ -9,11 +9,24 @@ const CSS_TEXT = `
     color:#111;z-index:2147483647}
     .wn-header{display:flex;align-items:center;gap:8px;margin:4px 4px 8px}
     .wn-title{font-weight:600;flex:1}
+    .wn-add-btn{background:#111;color:#fff;border:none;border-radius:6px;
+        cursor:pointer;padding:2px 10px;font-weight:600;font-size: 16px;line-height: 1.2;}
     .wn-close,.wn-refresh{border:1px solid #e5e7eb;background:#f9fafb;border-radius:8px;
         cursor:pointer;padding:2px 8px}
         .wn-list{overflow:auto;max-height:65vh;padding:0 4px 4px}
         .wn-card{border:1px solid #eef2f7;border-radius:10px;padding:8px;margin:8px 0;background:#fafbfc}
-        .wn-sel{font-style:italic;color:#374151;margin-bottom:4px}
+        
+        /* --- THIS IS THE FIX --- */
+        .wn-sel{
+            font-style:italic;color:#374151;margin-bottom:4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2; /* Limit to 2 lines */
+            -webkit-box-orient: vertical;
+        }
+        /* --- END FIX --- */
+
         .wn-note{margin:4px 0}
         .wn-meta{font-size:12px;color:#6b7280}
         `;
@@ -31,6 +44,7 @@ const CSS_TEXT = `
             <div class="wn-root">
             <div class="wn-header">
             <div class="wn-title">Web Notes</div>
+            <button class="wn-add-btn" id="wn-add-note" title="Add Note">+</button>
             <button class="wn-refresh" title="Refresh">↻</button>
             <button class="wn-close" title="Hide">×</button>
             </div>
@@ -42,12 +56,14 @@ const CSS_TEXT = `
 
             // Event handling
             shadow.querySelector(".wn-close").addEventListener("click", () => {
-                // Dispatch event for content script to handle
                 document.dispatchEvent(new CustomEvent("wn-close"));
             });
 
             shadow.querySelector(".wn-refresh").addEventListener("click", () => {
-                // Dispatch event for content script to handle
                 document.dispatchEvent(new CustomEvent("wn-refresh"));
+            });
+
+            shadow.querySelector("#wn-add-note").addEventListener("click", () => {
+                document.dispatchEvent(new CustomEvent("wn-add-note"));
             });
         })();

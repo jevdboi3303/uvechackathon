@@ -1,8 +1,8 @@
 // ---- contentScript.js ----
-// Handles highlight detection, note creation, and sidebar rendering.
+// Handles note creation and sidebar rendering.
 // Relies on global functions postNote() and getNotesForUrl() defined in supabaseClient.js.
 
-let fab;
+let fab; // The floating button
 let sidebarOpen = false;
 
 // ---------- UID Helper ----------
@@ -17,12 +17,11 @@ async function getOrCreateUid() {
         return uid;
     } catch (err) {
         console.warn("Storage access failed, using fallback UID:", err);
-        // Happens if extension context is reloaded or user has disabled sync
         return "u_local_" + Math.random().toString(36).slice(2, 10);
     }
 }
 
-// ---------- Floating "+ Note" Button ----------
+// ---------- Floating "+ Note" Button (FOR SELECTIONS) ----------
 function ensureFab() {
     if (fab) return;
     fab = document.createElement("button");
@@ -31,78 +30,98 @@ function ensureFab() {
     fab.style.display = "none";
     document.documentElement.appendChild(fab);
 
-    fab.addEventListener("click", async () => {
-        const selection = window.getSelection();
-        const selectionText = selection ? selection.toString().trim() : "";
-        const pageUrl = location.origin + location.pathname;
-
-        const noteText = prompt("Add note (public):", "");
-        if (!noteText) return;
-
-        const uid = await getOrCreateUid();
-
-        try {
-            await postNote({
-                url: pageUrl,
-                selection_text: selectionText || null,
-                note_text: noteText,
-                user_id: uid
-            });
-            renderSidebar();
-            alert("Note posted.");
-        } catch (e) {
-            console.error("Post error:", e);
-            alert("Failed to post note.");
-        }
+    fab.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await addSelectionNote();
     });
 }
 
 function updateFabFromSelection() {
+    ensureFab();
     const sel = window.getSelection();
     const hasText = sel && sel.toString().trim().length > 0;
-    if (!fab) return;
-    fab.style.display = hasText ? "block" : (sidebarOpen ? "block" : "none");
+    
     if (hasText) {
         const rect = sel.getRangeAt(0).getBoundingClientRect();
+        fab.style.display = "block";
         fab.style.top = `${rect.bottom + window.scrollY + 8}px`;
         fab.style.left = `${rect.right + window.scrollX + 8}px`;
+    } else {
+        fab.style.display = "none";
     }
 }
 
-// ---------- Sidebar Toggle ----------
-document.addEventListener("selectionchange", () => {
-    ensureFab();
-    updateFabFromSelection();
-});
+// ---------- Sidebar Toggle & Events ----------
+document.addEventListener("selectionchange", updateFabFromSelection);
 
 document.addEventListener("keydown", (e) => {
     if (e.altKey && (e.key === "n" || e.key === "N")) {
-        // Toggle the current state
         toggleSidebar(!sidebarOpen);
     }
 });
 
 function toggleSidebar(open) {
-    sidebarOpen = open; // Set the state
-    ensureFab();
+    sidebarOpen = open;
     const panel = document.querySelector("#wn-panel");
     if (!panel) return;
-
     panel.style.display = open ? "block" : "none";
-    
-    // Also update FAB visibility
-    const hasText = window.getSelection().toString().trim().length > 0;
-    fab.style.display = (open || hasText) ? "block" : "none";
-    
     if (open) {
-        renderSidebar(); // Refresh notes when opening
+        renderSidebar();
     }
 }
+
+// ---------- Add Note Functions ----------
+async function addPageNote() {
+    const pageUrl = location.origin + location.pathname;
+    const noteText = prompt("Add note for this page (public):", "");
+    if (!noteText) return;
+    const uid = await getOrCreateUid();
+
+    try {
+        await postNote({
+            url: pageUrl,
+            selection_text: null,
+            note_text: noteText,
+            user_id: uid
+        });
+        renderSidebar();
+    } catch (e) {
+        console.error("Post error:", e);
+        alert("Failed to post note.");
+    }
+}
+
+async function addSelectionNote() {
+    const selection = window.getSelection();
+    const selectionText = selection ? selection.toString().trim() : "";
+    if (!selectionText) return;
+
+    const pageUrl = location.origin + location.pathname;
+    const noteText = prompt("Add note for this selection (public):", "");
+    if (!noteText) return;
+    const uid = await getOrCreateUid();
+
+    try {
+        await postNote({
+            url: pageUrl,
+            selection_text: selectionText,
+            note_text: noteText,
+            user_id: uid
+        });
+        renderSidebar();
+        window.getSelection().removeAllRanges();
+        fab.style.display = "none";
+    } catch (e) {
+        console.error("Post error:", e);
+        alert("Failed to post note.");
+    }
+}
+
 
 // ---------- Render Notes ----------
 async function renderSidebar() {
     const panel = document.querySelector("#wn-panel");
-    if (!panel || !panel.shadowRoot) return; // Check for shadowRoot
+    if (!panel || !panel.shadowRoot) return;
     
     const container = panel.shadowRoot.querySelector(".wn-list");
     if (!container) return;
@@ -122,15 +141,20 @@ async function renderSidebar() {
             const card = document.createElement("div");
             card.className = "wn-card";
             const sel = n.selection_text ? `<div class="wn-sel">“${escapeHtml(n.selection_text)}”</div>` : "";
+
             card.innerHTML = `
             ${sel}
             <div class="wn-note">${escapeHtml(n.note_text)}</div>
             <div class="wn-meta">${new Date(n.created_at).toLocaleString()} · ${n.user_id}</div>
             `;
-            container.appendChild(card);
-            if (n.selection_text && n.selection_text.length < 160) {
-                highlightFirstOccurrence(n.selection_text);
+
+            if (n.selection_text) {
+                card.style.cursor = "pointer";
+                card.dataset.selectionText = n.selection_text; 
+                card.addEventListener('click', handleNoteClick);
             }
+
+            container.appendChild(card);
         });
     } catch (e) {
         console.error("Fetch error:", e);
@@ -138,35 +162,26 @@ async function renderSidebar() {
     }
 }
 
-function highlightFirstOccurrence(text) {
-    const body = document.body;
-    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
-    const target = text.trim();
-    while (walker.nextNode()) {
-        const node = walker.currentNode;
-        // Avoid highlighting inside our own panel
-        if (node.parentElement && node.parentElement.closest("#wn-panel")) {
-            continue;
-        }
-        
-        const idx = node.nodeValue.indexOf(target);
-        if (idx >= 0) {
-            // Check if already highlighted
-            if (node.parentElement.classList.contains("wn-highlight")) {
-                continue;
-            }
-            
-            const range = document.createRange();
-            range.setStart(node, idx);
-            range.setEnd(node, idx + target.length);
-            const mark = document.createElement("span");
-            mark.className = "wn-highlight";
-            range.surroundContents(mark);
-            return true;
-        }
+// --- NEW, SIMPLER CLICK HANDLER ---
+function handleNoteClick(event) {
+    const noteCard = event.currentTarget;
+    const textToFind = noteCard.dataset.selectionText;
+    if (!textToFind) return;
+
+    // Clear any previous selection
+    window.getSelection().removeAllRanges();
+
+    // Use Chrome's built-in Find function
+    const found = window.find(textToFind, false, false, true, false, false, false);
+    // (text, caseSensitive, backwards, wrapAround, wholeWord, searchInFrames, showDialog)
+
+    if (!found) {
+        alert("Could not find this highlight on the page. The content may have changed.");
     }
-    return false;
 }
+// --- END NEW HANDLER ---
+
+// --- highlightFirstOccurrence() FUNCTION IS NOW REMOVED ---
 
 function escapeHtml(s) {
     return s.replace(/[&<>"']/g, c => ({
@@ -179,8 +194,7 @@ function escapeHtml(s) {
 }
 
 // ---------- Init ----------
-ensureFab();
-toggleSidebar(true); // Open sidebar on load
+toggleSidebar(true); 
 
 // Listen for events from Shadow DOM
 document.addEventListener("wn-refresh", () => {
@@ -189,4 +203,8 @@ document.addEventListener("wn-refresh", () => {
 
 document.addEventListener("wn-close", () => {
     toggleSidebar(false);
+});
+
+document.addEventListener("wn-add-note", () => {
+    addPageNote();
 });

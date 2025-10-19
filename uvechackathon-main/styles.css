@@ -1,16 +1,11 @@
-/* Empty file reserved for future shared styles. Keeping for MV3 structure clarity. */
 /* styles.css */
 
-/* Style for highlighted text on the page */
-.wn-highlight {
-  background: #fff3b0;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px #fde68a;
-}
+/* --- REMOVED .wn-highlight and .wn-highlight-active --- */
+
 
 /* Style for the floating "+ Note" button */
 #wn-fab {
-  position: absolute;
+  position: absolute; /* Positioned by JS */
   z-index: 2147483647;
   padding: 6px 10px;
   border-radius: 999px;
@@ -20,4 +15,5 @@
   font: 13px ui-sans-serif, system-ui;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+  display: none; /* Hidden by default */
 }
