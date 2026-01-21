@@ -5,7 +5,7 @@
 let fab; // The floating button
 let sidebarOpen = false;
 
-// ---------- UID Helper ----------
+// --------- UID Helper ---------
 async function getOrCreateUid() {
     try {
         const stored = await chrome.storage.sync.get(["wn_uid"]);
